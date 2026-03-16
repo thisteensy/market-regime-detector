@@ -13,7 +13,15 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+import os
+from dotenv import load_dotenv
 import pandas as pd
+
+load_dotenv()
+
+INFLUX_USER = os.getenv('INFLUX_USER')
+INFLUX_PASSWORD = os.getenv('INFLUX_PASSWORD')
+KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'localhost:9092')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

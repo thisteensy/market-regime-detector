@@ -11,8 +11,14 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 import threading
+import os
+from dotenv import load_dotenv
 import pandas as pd
 from data_fetcher import DataFetcher
+
+load_dotenv()
+
+KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'localhost:9092')
 
 # Configure logging
 logging.basicConfig(
