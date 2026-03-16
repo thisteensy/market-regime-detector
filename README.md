@@ -6,12 +6,6 @@ A real-time streaming analytics pipeline that reveals **what actually drives EUR
 
 Most people see exchange rates as random noise. This project shows the underlying structure—the drivers that move markets in real-time.
 
-**For your job search**: This demonstrates:
-- ✅ Domain expertise (you actually live with FX concerns)
-- ✅ Production-grade streaming architecture (Flink, Kafka, time series DB)
-- ✅ Full-stack thinking (backend + frontend + DevOps)
-- ✅ Real data, real problems (not a toy project)
-
 ---
 
 ## Project Status
