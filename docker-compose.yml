@@ -42,6 +42,22 @@ services:
       - influxdb_data:/var/lib/influxdb2
     networks:
       - market-regime
+  
+  jobmanager:
+    image: flink:1.17
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    networks:
+      - market-regime
+
+  taskmanager:
+    image: flink:1.17
+    command: taskmanager
+    depends_on:
+      - jobmanager
+    networks:
+      - market-regime
 
 networks:
   market-regime:
