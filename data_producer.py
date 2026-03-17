@@ -8,7 +8,7 @@ This will feed data into the Flink streaming jobs.
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 import threading
 import os
@@ -107,7 +107,7 @@ class KafkaDataProducer:
     def produce_fx_rates(self, rates: Dict[str, float]) -> None:
         """Publish exchange rate update"""
         message = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'source': 'yahoo_finance',
             'data': rates,
             'schema_version': '1.0'
@@ -117,7 +117,7 @@ class KafkaDataProducer:
     def produce_commodities(self, prices: Dict[str, float]) -> None:
         """Publish commodity prices"""
         message = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'source': 'yahoo_finance',
             'commodities': prices,
             'schema_version': '1.0'
@@ -127,7 +127,7 @@ class KafkaDataProducer:
     def produce_indices(self, indices: Dict[str, float]) -> None:
         """Publish stock index updates"""
         message = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'source': 'yahoo_finance',
             'indices': indices,
             'schema_version': '1.0'
@@ -137,7 +137,7 @@ class KafkaDataProducer:
     def produce_yields(self, yields: Dict[str, float]) -> None:
         """Publish bond yield updates"""
         message = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'source': 'ecb',
             'yields': yields,
             'schema_version': '1.0'
@@ -147,7 +147,7 @@ class KafkaDataProducer:
     def produce_volatility(self, vol: Dict[str, float]) -> None:
         """Publish volatility indices"""
         message = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'source': 'yahoo_finance',
             'volatility': vol,
             'schema_version': '1.0'
@@ -200,9 +200,10 @@ class DataStreamingService:
             else:
                 # Live mode: fetch fresh data
                 data = self.fetcher.fetch_all()
-                # Publish latest row only
                 if len(data) > 0:
                     row = data.iloc[-1]
+                    # Override timestamp to current time
+                    row['timestamp'] = datetime.now(timezone.utc).isoformat()
                     self._publish_row(row)
         except Exception as e:
             logger.error(f"Error in run_once: {e}")

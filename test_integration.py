@@ -10,8 +10,9 @@ import json
 import sys
 from datetime import datetime, timedelta
 from collections import deque
+from pathlib import Path
 
-sys.path.insert(0, './flink_jobs')
+sys.path.insert(0, str(Path(__file__).parent / 'flink_jobs'))
 
 from job_1_normalization import NormalizationMapper
 from job_2_correlation import CorrelationCalculator
