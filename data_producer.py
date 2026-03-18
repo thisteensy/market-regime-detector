@@ -201,7 +201,7 @@ class DataStreamingService:
                 # Live mode: fetch fresh data
                 data = self.fetcher.fetch_all()
                 if len(data) > 0:
-                    row = data.iloc[-1]
+                    row = data.iloc[-1].copy()
                     # Override timestamp to current time
                     row['timestamp'] = datetime.now(timezone.utc).isoformat()
                     self._publish_row(row)
@@ -291,8 +291,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Stream market data to Kafka')
-    parser.add_argument('--mode', choices=['live', 'backtest'], default='backtest',
-                        help='live: fetch real data, backtest: replay historical')
+    
     parser.add_argument('--duration', type=int, default=60,
                         help='Duration in seconds (backtest mode)')
     parser.add_argument('--interval', type=int, default=5,
@@ -307,20 +306,19 @@ def main():
     print("\n" + "="*70)
     print(" EUR/USD CORRELATION PIPELINE - KAFKA DATA PRODUCER")
     print("="*70)
-    print(f"Mode: {args.mode}")
     print(f"Kafka: {args.kafka}")
     print()
     
     # Create producer
     producer = KafkaDataProducer(
         bootstrap_servers=args.kafka,
-        simulation_mode=(args.mode == 'backtest')  # Simulation for demo
+        simulation_mode=False  # Simulation for demo
     )
     
     # Create streaming service
-    if args.mode == 'backtest':
+    if True:
         # Load historical data for backtesting
-        logger.info("Loading historical data for backtest...")
+        logger.info("Loading historical data for playback...")
         fetcher = DataFetcher(lookback_days=args.lookback_days)
         backtest_data = fetcher.fetch_all()
         

@@ -46,11 +46,6 @@ def render_dashboard(state: DashboardState):
     print(f"{BOLD}{CYAN}║{RESET}  Time: {now}")
     print(f"{BOLD}{CYAN}╠════════════════════════════════════════════════════════════════╣{RESET}")
     
-    # DEBUG
-    print(f"\n{YELLOW}DEBUG:{RESET}")
-    print(f"  Buffer size: {state.buffer_size}")
-    print(f"  {state.debug_info}")
-    
     # Prices
     print(f"\n{BOLD}Current Prices:{RESET}")
     if state.current_prices:
@@ -84,7 +79,7 @@ def read_from_kafka(state: DashboardState):
             'fx-rates', 'commodities', 'indices', 'volatility', 'yields',
             bootstrap_servers=['localhost:9092'],
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            auto_offset_reset='latest',
+            auto_offset_reset='earliest',
             consumer_timeout_ms=1000,
             group_id='dashboard-consumer'
         )

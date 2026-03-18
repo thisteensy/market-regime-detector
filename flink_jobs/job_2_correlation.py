@@ -26,7 +26,9 @@ class CorrelationCalculator:
     def add_data_point(self, timestamp: str, symbol: str, value: float):
         """Add data point and clean old data."""
         try:
-            ts = datetime.fromisoformat(timestamp)
+            timestamp_clean = timestamp.split('+')[0]  # Remove +00:00
+            ts = datetime.fromisoformat(timestamp_clean)
+            ts = ts.replace(microsecond=0)
             self.data_buffer[symbol].append({'timestamp': ts, 'value': float(value)})
             
             # Remove old data outside window
@@ -59,6 +61,7 @@ class CorrelationCalculator:
                 inst_times = {p['timestamp'].timestamp(): p['value'] for p in inst_data}
                 
                 common_times = set(eur_times.keys()) & set(inst_times.keys())
+
                 if len(common_times) < 2:
                     correlations[symbol] = 0.0
                     continue
@@ -68,7 +71,7 @@ class CorrelationCalculator:
                 
                 corr = self._pearson(eur_vals, inst_vals)
                 correlations[symbol] = round(corr, 3)
-            
+                        
             return correlations
         except Exception as e:
             logger.error(f"Error calculating: {e}")
