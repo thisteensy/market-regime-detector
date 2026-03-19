@@ -2,22 +2,16 @@ version: '3.8'
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
+    image: confluentinc/cp-zookeeper:7.5.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
-    networks:
-      - market-regime
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zookeeper
-    ports:
-      - "9092:9092"
-      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -25,43 +19,5 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks:
-      - market-regime
-
-  influxdb:
-    image: influxdb:2.6
     ports:
-      - "8086:8086"
-    environment:
-      INFLUXDB_DB: market_regime
-      INFLUXDB_ADMIN_USER: ${INFLUX_USER}
-      INFLUXDB_ADMIN_PASSWORD: ${INFLUX_PASSWORD}
-      INFLUXDB_HTTP_AUTH_ENABLED: "false"
-    volumes:
-      - influxdb_data:/var/lib/influxdb2
-    networks:
-      - market-regime
-  
-  jobmanager:
-    image: flink:1.17
-    command: jobmanager
-    ports:
-      - "8081:8081"
-    networks:
-      - market-regime
-
-  taskmanager:
-    image: flink:1.17
-    command: taskmanager
-    depends_on:
-      - jobmanager
-    networks:
-      - market-regime
-
-networks:
-  market-regime:
-    driver: bridge
-
-volumes:
-  influxdb_data:
+      - "9092:9092"

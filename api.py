@@ -7,7 +7,7 @@ from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-sys.path.insert(0, './flink_jobs')
+sys.path.insert(0, './analytics')
 from job_2_correlation import CorrelationCalculator
 
 from kafka import KafkaConsumer
