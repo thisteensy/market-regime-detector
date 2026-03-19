@@ -4,34 +4,76 @@ const MarketRegimeHeatmap = () => {
   const instruments = ['EUR/USD', 'Oil', 'Gold', 'S&P 500', 'VIX', 'Bund Yield'];
   
   const [correlations, setCorrelations] = useState({
-    'EUR/USD': [1.00, 0.52, -0.18, -0.12, -0.45, 0.31],
-    'Oil': [0.52, 1.00, 0.25, 0.15, -0.38, -0.08],
-    'Gold': [-0.18, 0.25, 1.00, -0.22, 0.68, 0.12],
-    'S&P 500': [-0.12, 0.15, -0.22, 1.00, -0.72, -0.35],
-    'VIX': [-0.45, -0.38, 0.68, -0.72, 1.00, 0.41],
-    'Bund Yield': [0.31, -0.08, 0.12, -0.35, 0.41, 1.00]
+    'EUR/USD': [1.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+    'Oil': [0.00, 1.00, 0.00, 0.00, 0.00, 0.00],
+    'Gold': [0.00, 0.00, 1.00, 0.00, 0.00, 0.00],
+    'S&P 500': [0.00, 0.00, 0.00, 1.00, 0.00, 0.00],
+    'VIX': [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+    'Bund Yield': [0.00, 0.00, 0.00, 0.00, 0.00, 1.00]
   });
   
-  const [stats, setStats] = useState({ maxPos: 0.85, maxNeg: -0.78, regime: 'OIL' });
+  const [stats, setStats] = useState({ maxPos: 0, maxNeg: 0, regime: 'WAITING' });
   const [timestamp, setTimestamp] = useState(new Date().toLocaleTimeString());
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCorrelations(prev => {
-        const updated = { ...prev };
-        instruments.forEach(instr => {
-          updated[instr] = prev[instr].map((val, j) => {
-            if (instruments.indexOf(instr) !== j) {
-              return Math.max(-0.99, Math.min(0.99, val + (Math.random() - 0.5) * 0.1));
-            }
-            return val;
-          });
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/api/correlations');
+        const data = await response.json();
+        
+        setConnected(true);
+        setTimestamp(new Date().toLocaleTimeString());
+        
+        // Build correlation matrix from API data
+        const updated = { ...correlations };
+        const apiCorrs = data.correlations;
+        
+        // Map API field names to instrument names
+        const nameMap = {
+          'eur_usd': 'EUR/USD',
+          'oil': 'Oil',
+          'gold': 'Gold',
+          'sp500': 'S&P 500',
+          'vix': 'VIX',
+          'bund_yield': 'Bund Yield'
+        };
+        
+        // Fill in the correlation matrix
+        instruments.forEach((instr, i) => {
+          updated[instr] = [1.0, 0, 0, 0, 0, 0];
+          
+          // EUR/USD is always index 0
+          if (instr === 'EUR/USD') {
+            updated[instr][0] = 1.0;
+            updated[instr][1] = apiCorrs.oil || 0;
+            updated[instr][2] = apiCorrs.gold || 0;
+            updated[instr][3] = apiCorrs.sp500 || 0;
+            updated[instr][4] = apiCorrs.vix || 0;
+            updated[instr][5] = apiCorrs.bund_yield || 0;
+          } else {
+            // Other instruments: correlation with EUR/USD
+            const otherCorr = apiCorrs[Object.keys(nameMap).find(k => nameMap[k] === instr)] || 0;
+            updated[instr][0] = otherCorr;
+            updated[instr][instruments.indexOf(instr)] = 1.0;
+          }
         });
-        return updated;
-      });
-      setTimestamp(new Date().toLocaleTimeString());
-    }, 3000);
+        
+        setCorrelations(updated);
+        
+        // Update stats
+        const values = Object.values(apiCorrs).filter(v => typeof v === 'number');
+        const maxPos = Math.max(...values.filter(v => v > 0), 0);
+        const maxNeg = Math.min(...values.filter(v => v < 0), 0);
+        setStats({ maxPos, maxNeg, regime: data.regime.toUpperCase() });
+      } catch (error) {
+        setConnected(false);
+        console.error('Failed to fetch correlations:', error);
+      }
+    };
 
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -194,7 +236,12 @@ const MarketRegimeHeatmap = () => {
       <div style={styles.header}>
         <p style={styles.title}>Market Regime Detector</p>
         <p style={styles.subtitle}>EUR/USD Correlation Heatmap</p>
-        <p style={styles.timestamp}>Updated {timestamp}</p>
+        <p style={styles.timestamp}>
+          Updated {timestamp} 
+          <span style={{ marginLeft: '12px', color: connected ? '#00ff88' : '#ff4444' }}>
+            ● {connected ? 'Live' : 'Disconnected'}
+          </span>
+        </p>
       </div>
 
       <div style={styles.heatmapWrapper}>

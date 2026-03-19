@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Regime Detector</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0e27; font-family: 'Monaco', 'Courier New', monospace; }
+    .container { padding: 2rem; background: #0a0e27; }
+    .header { margin-bottom: 2rem; }
+    .title { font-size: 28px; font-weight: 700; color: #00ff88; text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+    .subtitle { font-size: 13px; color: #888; margin: 4px 0 0 0; }
+    .timestamp { font-size: 11px; color: #555; margin-top: 8px; font-style: italic; }
+    .status { margin-left: 12px; }
+    .status.connected { color: #00ff88; }
+    .status.disconnected { color: #ff4444; }
+    
+    .controls { margin: 1.5rem 0; display: flex; gap: 8px; flex-wrap: wrap; }
+    .window-btn { 
+      padding: 8px 12px; 
+      background: #1a1f2e; 
+      border: 1px solid #1a2547; 
+      color: #888; 
+      cursor: pointer; 
+      border-radius: 4px; 
+      font-family: monospace;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .window-btn:hover { background: #252d42; color: #aaa; }
+    .window-btn.active { background: #00ff88; color: #0a0e27; border-color: #00ff88; }
+    
+    .heatmap-wrapper { background: #111830; border: 1px solid #1a2547; border-radius: 8px; padding: 1.5rem; }
+    table { border-collapse: collapse; font-size: 13px; width: 100%; max-width: 400px; margin: 0 auto; }
+    thead th { color: #888; font-weight: 500; padding: 12px; text-align: left; border-bottom: 1px solid #1a2547; }
+    tbody tr { border-bottom: 1px solid #1a2547; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody th { color: #aaa; font-weight: 500; text-align: left; padding: 12px; border-right: 1px solid #1a2547; }
+    tbody td { padding: 12px; text-align: center; }
+    
+    .cell { width: 100px; padding: 12px; text-align: center; transition: transform 0.2s, box-shadow 0.2s; font-weight: 600; font-size: 11px; }
+    .cell:hover { transform: scale(1.05); box-shadow: 0 0 12px rgba(0, 255, 136, 0.3); }
+    
+    .cell-positive { background: linear-gradient(135deg, #00ff88 0%, #00cc6f 100%); color: #0a0e27; }
+    .cell-neutral { background: #1a1f2e; color: #666; }
+    .cell-negative { background: #3a3f4d; color: #888; }
+    .cell-high-positive { background: #00ff88; color: #0a0e27; font-weight: 700; }
+    .cell-high-negative { background: #2a2d38; color: #666; }
+    
+    .legend { margin-top: 1.5rem; display: flex; gap: 2rem; font-size: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-color { width: 32px; height: 20px; border-radius: 4px; border: 0.5px solid #1a2547; }
+    .legend-positive { background: linear-gradient(135deg, #00ff88 0%, #00cc6f 100%); }
+    .legend-neutral { background: #3a3f4d; }
+    .legend-negative { background: #2a2d38; }
+    .legend-label { color: #aaa; }
+    
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 1.5rem; }
+    .stat-card { background: #111830; border: 1px solid #1a2547; border-radius: 6px; padding: 12px; text-align: center; }
+    .stat-label { font-size: 11px; color: #888; margin-bottom: 6px; }
+    .stat-value { font-size: 18px; font-weight: 700; color: #00ff88; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <p class="title">Market Regime Detector</p>
+      <p class="subtitle">EUR/USD Correlation Heatmap</p>
+      <p class="timestamp">
+        Updated <span id="timestamp"></span>
+        <span class="status disconnected" id="status">● Connecting...</span>
+      </p>
+    </div>
+    
+    <div class="controls">
+      <button class="window-btn active" onclick="setWindow(360)">6h</button>
+      <button class="window-btn" onclick="setWindow(720)">12h</button>
+      <button class="window-btn" onclick="setWindow(1440)">1d</button>
+      <button class="window-btn" onclick="setWindow(10080)">1w</button>
+    </div>
+    
+    <div class="heatmap-wrapper">
+      <table id="heatmap"></table>
+    </div>
+    
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color legend-positive"></div>
+        <span class="legend-label">Positive (+0.7 to +1.0)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-neutral"></div>
+        <span class="legend-label">Neutral (-0.3 to +0.3)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color legend-negative"></div>
+        <span class="legend-label">Negative (-0.7 to -1.0)</span>
+      </div>
+    </div>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Strongest positive</div>
+        <div class="stat-value" id="maxPos">+0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Strongest negative</div>
+        <div class="stat-value" id="maxNeg">-0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active regime</div>
+        <div class="stat-value" id="regime">WAITING</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const instruments = ['EUR/USD', 'Oil', 'Gold', 'S&P 500', 'VIX', 'Bund Yield'];
+    const apiMap = {
+      'EUR/USD': 'eur_usd',
+      'Oil': 'oil',
+      'Gold': 'gold',
+      'S&P 500': 'sp500',
+      'VIX': 'vix',
+      'Bund Yield': 'bund_yield'
+    };
+    
+    let currentWindow = 360; // Default 6h
+
+    function getCellClass(value) {
+      if (value >= 0.7) return 'cell-high-positive';
+      if (value >= 0.3) return 'cell-positive';
+      if (value > -0.3) return 'cell-neutral';
+      if (value >= -0.7) return 'cell-negative';
+      return 'cell-high-negative';
+    }
+
+    function formatCorr(value) {
+      return (value >= 0 ? '+' : '') + value.toFixed(2);
+    }
+
+    function updateHeatmap(correlations, regime) {
+      const table = document.getElementById('heatmap');
+      
+      let html = '<thead><tr><th>Instrument</th><th>Correlation with EUR/USD</th></tr></thead><tbody>';
+      
+      instruments.forEach(instr => {
+        if (instr === 'EUR/USD') return;
+        
+        const value = correlations[apiMap[instr]] || 0;
+        const cellClass = getCellClass(value);
+        
+        html += `<tr>
+          <th>${instr}</th>
+          <td class="cell ${cellClass}" title="${instr} vs EUR/USD: ${formatCorr(value)}">${formatCorr(value)}</td>
+        </tr>`;
+      });
+      
+      html += '</tbody>';
+      table.innerHTML = html;
+      document.getElementById('regime').textContent = (regime || 'WAITING').toUpperCase();
+    }
+
+    async function fetchAndUpdate() {
+      try {
+        const response = await fetch(`http://localhost:5001/api/correlations?window=${currentWindow}`);
+        const data = await response.json();
+        
+        document.getElementById('status').className = 'status connected';
+        document.getElementById('status').textContent = '● Live';
+        document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
+        
+        updateHeatmap(data.correlations, data.regime);
+        
+        const values = Object.values(data.correlations).filter(v => typeof v === 'number');
+        const maxPos = Math.max(...values.filter(v => v > 0), 0);
+        const maxNeg = Math.min(...values.filter(v => v < 0), 0);
+        
+        document.getElementById('maxPos').textContent = formatCorr(maxPos);
+        document.getElementById('maxNeg').textContent = formatCorr(maxNeg);
+      } catch (error) {
+        document.getElementById('status').className = 'status disconnected';
+        document.getElementById('status').textContent = '● Disconnected';
+        console.error('Failed to fetch:', error);
+      }
+    }
+
+    function setWindow(minutes) {
+      currentWindow = minutes;
+      
+      // Update button states
+      document.querySelectorAll('.window-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      
+      // Fetch new data
+      fetchAndUpdate();
+    }
+
+    fetchAndUpdate();
+    setInterval(fetchAndUpdate, 2000);
+  </script>
+</body>
+</html>
