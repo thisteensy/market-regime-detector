@@ -183,7 +183,6 @@ class DataStreamingService:
         self.backtest_data = backtest_data
         self.backtest_index = 0
         self.running = False
-        self.fetcher = DataFetcher(lookback_days=90) if backtest_data is None else None
     
     def run_once(self) -> None:
         """Execute a single fetch-and-publish cycle"""
@@ -239,7 +238,7 @@ class DataStreamingService:
         
         # Yields
         self.producer.produce_yields({
-            'bund_yield': float(row['bund_yield']),
+            'bund_yield': float(row['bund']),
             'timestamp': timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp)
         })
     
@@ -294,12 +293,10 @@ def main():
     
     parser.add_argument('--duration', type=int, default=60,
                         help='Duration in seconds (backtest mode)')
-    parser.add_argument('--interval', type=int, default=120,
+    parser.add_argument('--interval', type=int, default=600,
                         help='Fetch interval in seconds')
     parser.add_argument('--kafka', default='localhost:9092',
                         help='Kafka bootstrap servers')
-    parser.add_argument('--lookback-days', type=int, default=30,
-                        help='Days of historical data to load (backtest mode)')
     
     args = parser.parse_args()
     
@@ -319,7 +316,7 @@ def main():
     if True:
         # Load historical data for backtesting
         logger.info("Loading historical data for playback...")
-        fetcher = DataFetcher(lookback_days=args.lookback_days)
+        fetcher = DataFetcher()
         backtest_data = fetcher.fetch_all()
         
         service = DataStreamingService(
