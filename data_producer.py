@@ -294,7 +294,7 @@ def main():
     
     parser.add_argument('--duration', type=int, default=60,
                         help='Duration in seconds (backtest mode)')
-    parser.add_argument('--interval', type=int, default=5,
+    parser.add_argument('--interval', type=int, default=120,
                         help='Fetch interval in seconds')
     parser.add_argument('--kafka', default='localhost:9092',
                         help='Kafka bootstrap servers')

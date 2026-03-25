@@ -1,125 +1,152 @@
 """
-Data Source Integration Layer
-Generates synthetic market data for streaming pipeline
+Global Market Data Fetcher - 24/5 Coverage
+Only includes successfully fetched data, no fallbacks
 """
 
+import requests
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
+import os
+from dotenv import load_dotenv
+import pytz
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(script_dir, '.env'))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class DataFetcher:
-    """Generates realistic synthetic market data"""
+class DataSourceConfig:
+    TWELVEDATA_BASE = "https://api.twelvedata.com"
+    TWELVEDATA_KEY = os.getenv("TWELVEDATA_API_KEY", "")
+
+
+class ExchangeHours:
+    @staticmethod
+    def is_us_hours():
+        et = pytz.timezone('US/Eastern')
+        now = datetime.now(et)
+        if now.weekday() >= 5:  # Weekend
+            return False
+        # 9:30 AM - 4:00 PM ET
+        time_in_minutes = now.hour * 60 + now.minute
+        return (9 * 60 + 30) <= time_in_minutes <= (16 * 60)
     
-    def __init__(self, lookback_days: int = 90):
-        self.lookback_days = lookback_days
-        self.lookback_start = datetime.now() - timedelta(days=lookback_days)
-        self.data = {}
+    @staticmethod
+    def is_asian_hours():
+        jst = pytz.timezone('Asia/Tokyo')
+        now = datetime.now(jst)
+        if now.weekday() >= 5:  # Weekend
+            return False
+        # 9:00 AM - 3:00 PM JST
+        return 9 <= now.hour <= 15
+
+
+class DataFetcher:
+    def __init__(self):
+        self.twelvedata_key = DataSourceConfig.TWELVEDATA_KEY
+        
+        self.symbols = {
+            'eur_usd': 'EUR/USD',
+            'oil': 'USO',
+            'gold': 'GLD',
+            'sp500': 'SPY',
+            'vix': 'UVXY',
+            'bund': 'IGOV',
+            'nikkei': 'EWJ'
+        }
+        
+        self.us_hours = ExchangeHours.is_us_hours()
+        self.asian_hours = ExchangeHours.is_asian_hours()
     
     def fetch_all(self) -> pd.DataFrame:
-        """Generate all instruments and combine into single dataframe"""
         print("\n" + "="*60)
-        print("🌐 Fetching Market Data")
+        print("🌐 Global Market Data (Real data only)")
         print("="*60)
         
-        print("\n📊 EUR/USD Exchange Rate...")
-        self.data['eur_usd'] = self._generate_eurusd()
+        if not self.twelvedata_key:
+            print("❌ No API key!")
+            return pd.DataFrame()
         
-        print("⛽ Oil (WTI Crude)...")
-        self.data['oil'] = self._generate_oil()
+        values = {'timestamp': [datetime.now()]}
         
-        print("🏆 Gold...")
-        self.data['gold'] = self._generate_gold()
+        # 24/5
+        print("\n📊 EUR/USD (24/5)...")
+        price = self._get_price('eur_usd')
+        if price:
+            values['eur_usd'] = [price]
         
-        print("📈 S&P 500...")
-        self.data['sp500'] = self._generate_sp500()
+        print("⛽ Oil - USO (24/5)...")
+        price = self._get_price('oil')
+        if price:
+            values['oil'] = [price]
         
-        print("📊 VIX (Volatility Index)...")
-        self.data['vix'] = self._generate_vix()
+        print("🏆 Gold - GLD (24/5)...")
+        price = self._get_price('gold')
+        if price:
+            values['gold'] = [price]
         
-        print("📉 German Bund 10Y Yield...")
-        self.data['bund_yield'] = self._generate_bund_yield()
+        # US Hours
+        if self.us_hours:
+            print("📈 S&P 500 - SPY (US hours)...")
+            price = self._get_price('sp500')
+            if price:
+                values['sp500'] = [price]
+            
+            print("📊 Volatility - UVXY (US hours)...")
+            price = self._get_price('vix')
+            if price:
+                values['vix'] = [price]
+            
+            print("📉 Bonds - IGOV (US hours)...")
+            price = self._get_price('bund')
+            if price:
+                values['bund'] = [price]
+        else:
+            print("⏰ US markets closed")
         
-        combined = self._combine_datasets()
-        print(f"\n✅ Combined {len(combined)} data points across all instruments")
+        # Asian Hours
+        if self.asian_hours:
+            print("🗾 Nikkei - EWJ (Asian hours)...")
+            price = self._get_price('nikkei')
+            if price:
+                values['nikkei'] = [price]
+        else:
+            print("⏰ Asian markets closed")
         
-        return combined
+        result = pd.DataFrame(values)
+        print(f"\n✅ Fetched {len(values)-1} instruments")
+        return result
     
-    def _generate_eurusd(self) -> pd.DataFrame:
-        """Generate realistic EUR/USD data"""
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 0.002)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'eur_usd': 1.0850 + base * 0.01 + np.random.randn(len(dates)) * 0.003
-        })
-    
-    def _generate_oil(self) -> pd.DataFrame:
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 0.3)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'oil': 75.0 + base + np.random.randn(len(dates)) * 1.0
-        })
-    
-    def _generate_gold(self) -> pd.DataFrame:
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 1.0)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'gold': 2050.0 + base * 10 + np.random.randn(len(dates)) * 5.0
-        })
-    
-    def _generate_sp500(self) -> pd.DataFrame:
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 3.0)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'sp500': 5000.0 + base * 10 + np.random.randn(len(dates)) * 20.0
-        })
-    
-    def _generate_vix(self) -> pd.DataFrame:
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 0.3)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'vix': 15.0 + np.abs(base) * 0.5 + np.random.randn(len(dates)) * 0.5
-        })
-    
-    def _generate_bund_yield(self) -> pd.DataFrame:
-        dates = pd.date_range(start=self.lookback_start, periods=1440, freq='1h')
-        base = np.cumsum(np.random.randn(len(dates)) * 0.01)
-        return pd.DataFrame({
-            'timestamp': dates,
-            'bund_yield': 2.5 + base * 0.01 + np.random.randn(len(dates)) * 0.02
-        })
-    
-    def _combine_datasets(self) -> pd.DataFrame:
-        """Merge all datasets on timestamp"""
-        df = self.data['eur_usd'].copy()
-        
-        for key, data in self.data.items():
-            if key != 'eur_usd':
-                df = pd.merge_asof(
-                    df.sort_values('timestamp'),
-                    data.sort_values('timestamp'),
-                    on='timestamp',
-                    direction='nearest',
-                    tolerance=pd.Timedelta('1h')
-                )
-        
-        df = df.dropna()
-        df = df.sort_values('timestamp').reset_index(drop=True)
-        
-        return df
+    def _get_price(self, key: str) -> float:
+        """Fetch price or return None"""
+        try:
+            symbol = self.symbols[key]
+            url = f"{DataSourceConfig.TWELVEDATA_BASE}/quote"
+            params = {'symbol': symbol, 'apikey': self.twelvedata_key}
+            
+            response = requests.get(url, params=params, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                price = float(data.get('close', 0))
+                
+                if price > 0:
+                    print(f"  ✓ {key}: {price}")
+                    return price
+            
+            print(f"  ✗ {key}: Failed")
+            return None
+            
+        except Exception as e:
+            print(f"  ✗ {key}: {e}")
+            return None
 
 
 if __name__ == '__main__':
-    fetcher = DataFetcher(lookback_days=30)
+    fetcher = DataFetcher()
     data = fetcher.fetch_all()
-    print("\nSample Data (first 5 rows):")
-    print(data.head())
+    print("\nData:")
+    print(data)
