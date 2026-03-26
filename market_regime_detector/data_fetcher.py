@@ -1,6 +1,5 @@
 """
 Global Market Data Fetcher - 24/5 Coverage
-Only includes successfully fetched data, no fallbacks
 """
 
 import requests
@@ -11,8 +10,9 @@ import os
 from dotenv import load_dotenv
 import pytz
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(script_dir, '.env'))
+# Load .env from project root (go up one level from package)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(project_root, '.env'))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,20 +28,10 @@ class ExchangeHours:
     def is_us_hours():
         et = pytz.timezone('US/Eastern')
         now = datetime.now(et)
-        if now.weekday() >= 5:  # Weekend
+        if now.weekday() >= 5:
             return False
-        # 9:30 AM - 4:00 PM ET
         time_in_minutes = now.hour * 60 + now.minute
         return (9 * 60 + 30) <= time_in_minutes <= (16 * 60)
-    
-    @staticmethod
-    def is_asian_hours():
-        jst = pytz.timezone('Asia/Tokyo')
-        now = datetime.now(jst)
-        if now.weekday() >= 5:  # Weekend
-            return False
-        # 9:00 AM - 3:00 PM JST
-        return 9 <= now.hour <= 15
 
 
 class DataFetcher:
@@ -59,7 +49,6 @@ class DataFetcher:
         }
         
         self.us_hours = ExchangeHours.is_us_hours()
-        self.asian_hours = ExchangeHours.is_asian_hours()
     
     def fetch_all(self) -> pd.DataFrame:
         print("\n" + "="*60)
@@ -88,7 +77,12 @@ class DataFetcher:
         if price:
             values['gold'] = [price]
         
-        # US Hours
+        print("🗾 Nikkei - EWJ (24/5)...")
+        price = self._get_price('nikkei')
+        if price:
+            values['nikkei'] = [price]
+        
+        # US Hours only
         if self.us_hours:
             print("📈 S&P 500 - SPY (US hours)...")
             price = self._get_price('sp500')
@@ -106,15 +100,6 @@ class DataFetcher:
                 values['bund'] = [price]
         else:
             print("⏰ US markets closed")
-        
-        # Asian Hours
-        if self.asian_hours:
-            print("🗾 Nikkei - EWJ (Asian hours)...")
-            price = self._get_price('nikkei')
-            if price:
-                values['nikkei'] = [price]
-        else:
-            print("⏰ Asian markets closed")
         
         result = pd.DataFrame(values)
         print(f"\n✅ Fetched {len(values)-1} instruments")
@@ -143,10 +128,3 @@ class DataFetcher:
         except Exception as e:
             print(f"  ✗ {key}: {e}")
             return None
-
-
-if __name__ == '__main__':
-    fetcher = DataFetcher()
-    data = fetcher.fetch_all()
-    print("\nData:")
-    print(data)

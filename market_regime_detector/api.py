@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 sys.path.insert(0, './analytics')
-from job_2_correlation import CorrelationCalculator
+from market_regime_detector.analytics.job_2_correlation import CorrelationCalculator
 
 from kafka import KafkaConsumer
 import uuid

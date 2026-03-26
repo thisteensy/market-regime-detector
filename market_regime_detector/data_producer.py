@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 import os
 from dotenv import load_dotenv
-from data_fetcher import DataFetcher
+from market_regime_detector.data_fetcher import DataFetcher
 
 load_dotenv()
 
