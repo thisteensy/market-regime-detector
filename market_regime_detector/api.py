@@ -6,13 +6,16 @@ import json
 from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-
-sys.path.insert(0, './analytics')
 from market_regime_detector.analytics.job_2_correlation import CorrelationCalculator
-
 from kafka import KafkaConsumer
 import uuid
 import threading
+import os
+from dotenv import load_dotenv
+
+# Load .env
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(project_root, '.env'))
 
 app = Flask(__name__)
 CORS(app)
@@ -39,7 +42,7 @@ def consume_kafka():
     print("Starting Kafka consumer thread...")
     try:
         consumer = KafkaConsumer(
-            'fx-rates', 'commodities', 'indices', 'volatility', 'yields',
+            'market-data',
             bootstrap_servers=['localhost:9092'],
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             auto_offset_reset='latest',
@@ -58,24 +61,22 @@ def consume_kafka():
                         data = record.value
                         timestamp = data.get('timestamp', datetime.utcnow().isoformat())
                         
-                        # Extract data
-                        for key in ['data', 'commodities', 'indices', 'volatility', 'yields']:
-                            if key in data and isinstance(data[key], dict):
-                                for symbol, value in data[key].items():
-                                    if symbol != 'timestamp':
-                                        try:
-                                            val = float(value)
-                                            state['prices'][symbol] = val
-                                            # Add to all calculators
-                                            for calc in calculators.values():
-                                                calc.add_data_point(timestamp, symbol, val)
-                                        except (ValueError, TypeError):
-                                            pass
+                        # Extract data from flat structure
+                        if 'data' in data and isinstance(data['data'], dict):
+                            for symbol, value in data['data'].items():
+                                try:
+                                    val = float(value)
+                                    state['prices'][symbol] = val
+                                    # Add to all calculators
+                                    for calc in calculators.values():
+                                        calc.add_data_point(timestamp, symbol, val)
+                                except (ValueError, TypeError):
+                                    pass
                         
                         state['messages_received'] += 1
                         state['last_update'] = datetime.now().isoformat()
                         
-                        if state['messages_received'] % 50 == 0:
+                        if state['messages_received'] % 10 == 0:
                             buffer_size = len(calculators[1440].data_buffer.get('eur_usd', []))
                             print(f"📊 Processed {state['messages_received']} messages, buffer: {buffer_size}")
     
